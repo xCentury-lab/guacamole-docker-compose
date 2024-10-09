@@ -93,6 +93,8 @@
 networks:
   guacnetwork_compose:
     driver: bridge
+  my-network:
+    driver: bridge
 
 # services
 services:
@@ -102,27 +104,29 @@ services:
     image: guacamole/guacd
     networks:
       - guacnetwork_compose
+      - my-network
     restart: always
     volumes:
     - ./drive:/drive:rw
     - ./record:/record:rw
+
   # postgres
   postgres:
     container_name: postgres_guacamole_compose
     environment:
       PGDATA: /var/lib/postgresql/data/guacamole
       POSTGRES_DB: guacamole_db
-      POSTGRES_PASSWORD: 'ChooseYourOwnPasswordHere1234'
+      POSTGRES_PASSWORD: ChooseYourOwnPasswordHere1234
       POSTGRES_USER: guacamole_user
-    image: postgres:15.2-alpine
+    image: postgres
     networks:
       - guacnetwork_compose
+      - my-network
     restart: always
     volumes:
-    - ./init:/docker-entrypoint-initdb.d:z
-    - ./data:/var/lib/postgresql/data:Z
+    - ./init:/docker-entrypoint-initdb.d:ro
+    - ./data:/var/lib/postgresql/data:rw
 
-  # guacamole
   guacamole:
     container_name: guacamole_compose
     depends_on:
@@ -137,11 +141,12 @@ services:
     image: guacamole/guacamole
     networks:
       - guacnetwork_compose
+      - my-network
     volumes:
       - ./record:/record:rw
     ports:
 ## enable next line if not using nginx
-##    - 8080:8080/tcp # Guacamole is on :8080/guacamole, not /.
+    - 8080:8080/tcp # Guacamole is on :8080/guacamole, not /.
 ## enable next line when using nginx
     - 8080/tcp
     restart: always
@@ -158,7 +163,21 @@ services:
    - ./nginx/ssl/self-ssl.key:/etc/nginx/ssl/self-ssl.key:ro
    ports:
    - 443:443
-   - 80:8080
+   - 80:80
    networks:
      - guacnetwork_compose
+     - my-network
+#   extra_hosts:
+#      - "www.createyourown.domain:192.168.11.35"
+
+
+  # 最後に、cloudflaredコンテナーを追加します
+  cloudflared:
+    image: cloudflare/cloudflared:latest
+    command: tunnel --no-autoupdate run --token 
+    restart: always
+    networks:
+      - my-network
+
+
 ####################################################################################
